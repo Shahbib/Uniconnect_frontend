@@ -6,10 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Send, Paperclip, Sparkles, BookOpen, Brain, Lightbulb, MessageSquare } from "lucide-react"
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
+import { Bot, Send, Paperclip, Sparkles, BookOpen, Brain, Lightbulb, MessageSquare, Info } from "lucide-react"
 import { Navbar } from "@/components/navbar"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 
 interface Message {
   id: number
@@ -124,13 +123,6 @@ export default function AIChatbot() {
     setInputMessage(suggestion)
   }
 
-  const quickActions = [
-    { icon: BookOpen, label: "Review Notes", color: "bg-blue-500" },
-    { icon: Brain, label: "Take Quiz", color: "bg-purple-500" },
-    { icon: Lightbulb, label: "Get Suggestions", color: "bg-yellow-500" },
-    { icon: MessageSquare, label: "Study Help", color: "bg-green-500" },
-  ]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-blue-50">
       <Navbar />
@@ -153,24 +145,23 @@ export default function AIChatbot() {
                 <Sparkles className="h-3 w-3 mr-1" />
                 AI Powered
               </Badge>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="p-0 h-6 w-6">
+                    <Info className="h-4 w-4 text-green-700" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="max-w-xs text-sm whitespace-pre-line">
+                  <strong>AI Chatbot</strong>
+                  <br />
+                  <br />
+                  This assistant uses advanced AI to answer your study questions, suggest resources, quiz you, and help with projects.
+                  <br />
+                  <br />
+                  Your messages are private and not shared with others.
+                </PopoverContent>
+              </Popover>
             </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            {quickActions.map((action, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                className="h-16 flex-col gap-2 hover:shadow-md transition-all bg-transparent"
-                onClick={() => handleSuggestionClick(action.label)}
-              >
-                <div className={`p-2 rounded-full ${action.color} text-white`}>
-                  <action.icon className="h-4 w-4" />
-                </div>
-                <span className="text-xs">{action.label}</span>
-              </Button>
-            ))}
           </div>
 
           {/* Chat Messages */}
@@ -183,7 +174,7 @@ export default function AIChatbot() {
             </CardHeader>
 
             <CardContent className="flex-1 p-0 flex flex-col">
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 p-4 space-y-4 overflow-y-auto" style={{ maxHeight: '60vh' }}>
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -241,32 +232,6 @@ export default function AIChatbot() {
                     </div>
                   </div>
                 ))}
-
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="flex items-start gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-gradient-to-r from-green-500 to-blue-500 text-white">
-                          <Bot className="h-4 w-4" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="bg-white border shadow-sm p-3 rounded-lg">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                          <div
-                            className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
-                            style={{ animationDelay: "0.1s" }}
-                          ></div>
-                          <div
-                            className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
-                            style={{ animationDelay: "0.2s" }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div ref={messagesEndRef} />
               </div>
 
