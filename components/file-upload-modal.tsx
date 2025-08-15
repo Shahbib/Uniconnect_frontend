@@ -10,7 +10,7 @@ interface FileUploadModalProps {
   onUpload: (data: {
     title: string;
     subject: string;
-    course: string;
+    course_code: string;
     description: string;
     files: File[];
     tags?: string[];
@@ -21,7 +21,7 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ open, onClose, onUplo
   const [formData, setFormData] = useState({
     title: "",
     subject: "",
-    course: "",
+    course_code: "",
     description: "",
     files: [] as File[], // now supports multiple images
     tags: [] as string[],
@@ -64,12 +64,41 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ open, onClose, onUplo
   setFormData((prev) => ({ ...prev, files }));
   };
 
-  const handleUpload = () => {
+  const [uploading, setUploading] = useState(false);
+  const handleUpload = async () => {
     if (formData.files.length > 0) {
-      onUpload({
-        ...formData,
-        files: formData.files,
-      });
+      setUploading(true);
+      // Prepare FormData for POST /notes
+      const fd = new FormData();
+      formData.files.forEach(file => fd.append("files", file));
+      fd.append("title", formData.title);
+      fd.append("subject", formData.subject);
+      fd.append("course_code", formData.course_code);
+      fd.append("description", formData.description);
+      fd.append("tags", JSON.stringify(formData.tags));
+      // Optionally add user email if available
+      const email = typeof window !== "undefined" ? (localStorage.getItem("email") || "") : "";
+      if (email) fd.append("email", email);
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      try {
+        const res = await fetch("http://localhost:9000/notes", {
+          method: "POST",
+          headers: {
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          },
+          body: fd
+        });
+        const data = await res.json();
+        if (data.success) {
+          onUpload({ ...formData, files: formData.files });
+          onClose();
+        } else {
+          alert(data.message || "Failed to upload notes.");
+        }
+      } catch {
+        alert("Network error. Please try again.");
+      }
+      setUploading(false);
     }
   };
 
@@ -103,11 +132,11 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ open, onClose, onUplo
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Course</label>
+            <label className="block text-sm font-medium mb-1">Course_Code</label>
             <Input
-              name="course"
-              placeholder="Course"
-              value={formData.course}
+              name="course_code"
+              placeholder="Course_Code"
+              value={formData.course_code}
               onChange={handleInputChange}
               className="mb-2"
             />
@@ -179,10 +208,25 @@ const FileUploadModal: React.FC<FileUploadModalProps> = ({ open, onClose, onUplo
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
+
             Cancel
           </Button>
-          <Button onClick={handleUpload} disabled={formData.files.length === 0 || !formData.title.trim()}>
-            Upload
+          <Button
+            className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
+            onClick={handleUpload}
+            disabled={formData.files.length === 0 || uploading}
+          >
+            {uploading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+                Uploading...
+              </span>
+            ) : (
+              "Upload"
+            )}
           </Button>
         </div>
       </div>

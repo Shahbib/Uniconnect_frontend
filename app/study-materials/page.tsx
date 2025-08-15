@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -35,19 +35,13 @@ import {
 import { Navbar } from "@/components/navbar"
 import FileUploadModal from "../../components/file-upload-modal"
 
-interface Message {
-  id: number
-  content: string
-  sender: "user" | "bot"
-  timestamp: Date
-  suggestions?: string[]
-}
+
 
 interface Upload {
   id: number
   title: string
   subject: string
-  course: string
+  course_code: string
   description: string
   sizes: string[]
   uploadedAt: string
@@ -57,399 +51,104 @@ interface Upload {
 }
 
 export default function StudyMaterials() {
+  // State for all materials
+  const [materials, setMaterials] = useState<any[]>([]);
+  // Get email from localStorage (previous version, capital 'E')
+  const email = typeof window !== "undefined" ? (localStorage.getItem("Email") || "") : "";
+
+  // Fetch uploads from GraphQL API
+  useEffect(() => {
+    if (!email) return;
+    const fetchUploads = async () => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch("http://localhost:9000/graphql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          query: `query GetNotesByEmail($email: String!) { getNotesByEmail(email: $email) { id title subject course_code tags description folder_id urls createdAt isFavorite score feedback } }`,
+          variables: { email },
+        }),
+      });
+      const data = await res.json();
+      if (data?.data?.getNotesByEmail) {
+        setMyUploads(data.data.getNotesByEmail);
+      }
+    };
+    fetchUploads();
+  }, [email]);
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedSubject, setSelectedSubject] = useState("")
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      content:
-        "Hi! I'm your AI study assistant. I have access to all your notes, skills, and achievements. How can I help you today?",
-      sender: "bot",
-      timestamp: new Date(),
-      suggestions: [
-        "Explain my Data Structures notes",
-        "Quiz me on Machine Learning",
-        "Suggest skills to learn next",
-        "Help with my project",
-      ],
-    },
-  ])
-  const [inputMessage, setInputMessage] = useState("")
-  const [isTyping, setIsTyping] = useState(false)
+  // Fetch notes from backend using searchNotes GraphQL
+  useEffect(() => {
+    const fetchNotes = async (keyword: string) => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch("http://localhost:9000/graphql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          query: `query SearchNotes($keyword: String!) { searchNotes(keyword: $keyword) { id email title subject course_code tags description folder_id urls createdAt isFavorite score feedback } }`,
+          variables: { keyword },
+        }),
+      });
+      const data = await res.json();
+      if (data?.data?.searchNotes) {
+        setMaterials(data.data.searchNotes);
+      } else {
+        setMaterials([]);
+      }
+    };
+
+    fetchNotes(searchTerm);
+  }, [searchTerm]);
+
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
-  // Remove selectedFile, not needed for multiple images
   const [myUploads, setMyUploads] = useState<Upload[]>([])
-  const [myNotes, setMyNotes] = useState<Upload[]>([])
   const [favorites, setFavorites] = useState<any[]>([])
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const materials = [
-    {
-      id: 1,
-      title: "Data Structures and Algorithms - Complete Notes",
-      subject: "Computer Science",
-      course: "CS 201",
-      author: "Sarah Chen",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "MIT",
-      pages: 45,
-      rating: 4.8,
-      downloads: 1234,
-      views: 5678,
-      comments: 23,
-      likes: 156,
-      uploadDate: "2 Aug 2025",
-      tags: ["Algorithms", "Data Structures", "Python", "Complexity"],
-      aiScore: 95,
-      description:
-        "Comprehensive notes covering all major data structures including arrays, linked lists, trees, graphs, and their algorithms with Python implementations.",
-      verified: true,
-    },
-    {
-      id: 2,
-      title: "Machine Learning Fundamentals Video Lectures",
-      subject: "Artificial Intelligence",
-      course: "AI 301",
-      author: "Alex Rodriguez",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Stanford",
-      duration: "3h 45m",
-      rating: 4.9,
-      downloads: 892,
-      views: 3421,
-      comments: 45,
-      likes: 234,
-      uploadDate: "9 Aug 2025",
-      tags: ["Machine Learning", "Neural Networks", "TensorFlow"],
-      aiScore: 92,
-      description:
-        "Video series covering supervised and unsupervised learning, neural networks, and practical implementations using TensorFlow.",
-      verified: true,
-    },
-    {
-      id: 3,
-      title: "Calculus II - Integration Techniques",
-      subject: "Mathematics",
-      course: "MATH 152",
-      author: "Emma Thompson",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Harvard",
-      pages: 28,
-      rating: 4.6,
-      downloads: 567,
-      views: 2134,
-      comments: 12,
-      likes: 89,
-      uploadDate: "5 Aug 2025",
-      tags: ["Calculus", "Integration", "Mathematics"],
-      aiScore: 88,
-      description:
-        "Detailed notes on various integration techniques including substitution, integration by parts, and partial fractions.",
-      verified: false,
-    },
-    {
-      id: 1,
-      title: "Data Structures and Algorithms - Complete Notes",
-      subject: "Computer Science",
-      course: "CS 201",
-      author: "Sarah Chen",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "MIT",
-      pages: 45,
-      rating: 4.8,
-      downloads: 1234,
-      views: 5678,
-      comments: 23,
-      likes: 156,
-      uploadDate: "2 Aug 2025",
-      tags: ["Algorithms", "Data Structures", "Python", "Complexity"],
-      aiScore: 95,
-      description:
-        "Comprehensive notes covering all major data structures including arrays, linked lists, trees, graphs, and their algorithms with Python implementations.",
-      verified: true,
-    },
-    {
-      id: 2,
-      title: "Machine Learning Fundamentals Video Lectures",
-      subject: "Artificial Intelligence",
-      course: "AI 301",
-      author: "Alex Rodriguez",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Stanford",
-      duration: "3h 45m",
-      rating: 4.9,
-      downloads: 892,
-      views: 3421,
-      comments: 45,
-      likes: 234,
-      uploadDate: "9 Aug 2025",
-      tags: ["Machine Learning", "Neural Networks", "TensorFlow"],
-      aiScore: 92,
-      description:
-        "Video series covering supervised and unsupervised learning, neural networks, and practical implementations using TensorFlow.",
-      verified: true,
-    },
-    {
-      id: 3,
-      title: "Calculus II - Integration Techniques",
-      subject: "Mathematics",
-      course: "MATH 152",
-      author: "Emma Thompson",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Harvard",
-      pages: 28,
-      rating: 4.6,
-      downloads: 567,
-      views: 2134,
-      comments: 12,
-      likes: 89,
-      uploadDate: "5 Aug 2025",
-      tags: ["Calculus", "Integration", "Mathematics"],
-      aiScore: 88,
-      description:
-        "Detailed notes on various integration techniques including substitution, integration by parts, and partial fractions.",
-      verified: false,
-    },
-    {
-      id: 1,
-      title: "Data Structures and Algorithms - Complete Notes",
-      subject: "Computer Science",
-      course: "CS 201",
-      author: "Sarah Chen",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "MIT",
-      pages: 45,
-      rating: 4.8,
-      downloads: 1234,
-      views: 5678,
-      comments: 23,
-      likes: 156,
-      uploadDate: "2 Aug 2025",
-      tags: ["Algorithms", "Data Structures", "Python", "Complexity"],
-      aiScore: 95,
-      description:
-        "Comprehensive notes covering all major data structures including arrays, linked lists, trees, graphs, and their algorithms with Python implementations.",
-      verified: true,
-    },
-    {
-      id: 2,
-      title: "Machine Learning Fundamentals Video Lectures",
-      subject: "Artificial Intelligence",
-      course: "AI 301",
-      author: "Alex Rodriguez",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Stanford",
-      duration: "3h 45m",
-      rating: 4.9,
-      downloads: 892,
-      views: 3421,
-      comments: 45,
-      likes: 234,
-      uploadDate: "9 Aug 2025",
-      tags: ["Machine Learning", "Neural Networks", "TensorFlow"],
-      aiScore: 92,
-      description:
-        "Video series covering supervised and unsupervised learning, neural networks, and practical implementations using TensorFlow.",
-      verified: true,
-    },
-    {
-      id: 3,
-      title: "Calculus II - Integration Techniques",
-      subject: "Mathematics",
-      course: "MATH 152",
-      author: "Emma Thompson",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Harvard",
-      pages: 28,
-      rating: 4.6,
-      downloads: 567,
-      views: 2134,
-      comments: 12,
-      likes: 89,
-      uploadDate: "5 Aug 2025",
-      tags: ["Calculus", "Integration", "Mathematics"],
-      aiScore: 88,
-      description:
-        "Detailed notes on various integration techniques including substitution, integration by parts, and partial fractions.",
-      verified: false,
-    },
-    {
-      id: 1,
-      title: "Data Structures and Algorithms - Complete Notes",
-      subject: "Computer Science",
-      course: "CS 201",
-      author: "Sarah Chen",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "MIT",
-      pages: 45,
-      rating: 4.8,
-      downloads: 1234,
-      views: 5678,
-      comments: 23,
-      likes: 156,
-      uploadDate: "2 Aug 2025",
-      tags: ["Algorithms", "Data Structures", "Python", "Complexity"],
-      aiScore: 95,
-      description:
-        "Comprehensive notes covering all major data structures including arrays, linked lists, trees, graphs, and their algorithms with Python implementations.",
-      verified: true,
-    },
-    {
-      id: 2,
-      title: "Machine Learning Fundamentals Video Lectures",
-      subject: "Artificial Intelligence",
-      course: "AI 301",
-      author: "Alex Rodriguez",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Stanford",
-      duration: "3h 45m",
-      rating: 4.9,
-      downloads: 892,
-      views: 3421,
-      comments: 45,
-      likes: 234,
-      uploadDate: "9 Aug 2025",
-      tags: ["Machine Learning", "Neural Networks", "TensorFlow"],
-      aiScore: 92,
-      description:
-        "Video series covering supervised and unsupervised learning, neural networks, and practical implementations using TensorFlow.",
-      verified: true,
-    },
-    {
-      id: 3,
-      title: "Calculus II - Integration Techniques",
-      subject: "Mathematics",
-      course: "MATH 152",
-      author: "Emma Thompson",
-      authorAvatar: "/placeholder.svg?height=32&width=32",
-      university: "Harvard",
-      pages: 28,
-      rating: 4.6,
-      downloads: 567,
-      views: 2134,
-      comments: 12,
-      likes: 89,
-      uploadDate: "5 Aug 2025",
-      tags: ["Calculus", "Integration", "Mathematics"],
-      aiScore: 88,
-      description:
-        "Detailed notes on various integration techniques including substitution, integration by parts, and partial fractions.",
-      verified: false,
-    },
-  ]
-
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
-
-    const userMessage: Message = {
-      id: messages.length + 1,
-      content: inputMessage,
-      sender: "user",
-      timestamp: new Date(),
+  // Material type is not used directly, so removed for brevity
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  // Helper to fetch uploads (for refresh)
+  const fetchUploads = async () => {
+    if (!email) return;
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const res = await fetch("http://localhost:9000/graphql", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        query: `query GetNotesByEmail($email: String!) { getNotesByEmail(email: $email) { id title subject course_code tags description folder_id urls createdAt isFavorite score feedback } }`,
+        variables: { email },
+      }),
+    });
+    const data = await res.json();
+    if (data?.data?.getNotesByEmail) {
+      setMyUploads(data.data.getNotesByEmail);
     }
+  };
+  // removed duplicate materials declaration; using stateful version only
 
-    setMessages((prev) => [...prev, userMessage])
-    setInputMessage("")
-    setIsTyping(true)
-
-    // Simulate AI response
-    setTimeout(() => {
-      const botResponse: Message = {
-        id: messages.length + 2,
-        content: generateBotResponse(inputMessage),
-        sender: "bot",
-        timestamp: new Date(),
-        suggestions: generateSuggestions(inputMessage),
-      }
-      setMessages((prev) => [...prev, botResponse])
-      setIsTyping(false)
-    }, 1500)
-  }
-
-  const generateBotResponse = (input: string): string => {
-    const lowerInput = input.toLowerCase()
-
-    if (lowerInput.includes("data structures")) {
-      return "Based on your Data Structures notes, I can see you've covered arrays, linked lists, and trees. Your notes show strong understanding of time complexity analysis. Would you like me to create a quiz on binary trees or explain any specific concept in more detail?"
-    }
-
-    if (lowerInput.includes("machine learning") || lowerInput.includes("ml")) {
-      return "I see you've been working on machine learning projects! Your notes cover supervised learning algorithms like linear regression and decision trees. Your recent sentiment analysis project achieved 94% accuracy - impressive! What specific ML topic would you like to explore further?"
-    }
-
-    if (lowerInput.includes("javascript") || lowerInput.includes("js")) {
-      return "Looking at your JavaScript ES6 notes, you've covered arrow functions, destructuring, and promises. Your React Hooks notes are particularly detailed. Would you like me to explain any specific concept or create practice exercises?"
-    }
-
-    return (
-      "I understand you're asking about '" +
-      input +
-      "'. Based on your learning history and notes, I can provide personalized guidance. Could you be more specific about what you'd like to know or learn?"
-    )
-  }
-
-  const generateSuggestions = (input: string): string[] => {
-    const lowerInput = input.toLowerCase()
-
-    if (lowerInput.includes("data structures")) {
-      return [
-        "Create a binary tree quiz",
-        "Explain graph algorithms",
-        "Compare sorting algorithms",
-        "Practice coding problems",
-      ]
-    }
-
-    if (lowerInput.includes("javascript")) {
-      return ["Explain closures", "Create React quiz", "Practice ES6 features", "Review async/await"]
-    }
-
-    return ["Show my learning progress", "Suggest study schedule", "Find related resources", "Create practice quiz"]
-  }
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInputMessage(suggestion)
-  }
 
   const handleMaterialUpload = async (data: {
-  title: string
-  subject: string
-  course: string
-  description: string
-  files: File[]
-  tags?: string[]
+    title: string;
+    subject: string;
+    course_code: string;
+    description: string;
+    files: File[];
+    tags?: string[];
   }) => {
-      await new Promise((res) => setTimeout(res, 1200))
-
-      // Convert images to URLs for preview (in real app, upload to server)
-      const images = data.files.map(file => URL.createObjectURL(file));
-      const sizes = data.files.map(file => `${(file.size / 1024).toFixed(1)} KB`);
-
-      const newMaterial: Upload = {
-        id: myUploads.length + 1,
-        title: data.title,
-        subject: data.subject,
-        course: data.course,
-        description: data.description,
-        sizes,
-        uploadedAt: "just now",
-        tags: data.tags || [],
-        images,
-      }
-
-      setMyUploads((prev) => [newMaterial, ...prev])
-      setMyNotes((prev) => [...prev, newMaterial])
-      setUploadModalOpen(false)
-    }
+  await new Promise((res) => setTimeout(res, 1200));
+  // ...existing code for upload (simulate or real upload)...
+  setUploadModalOpen(false);
+  // Refresh uploads from backend after upload
+  fetchUploads();
+  };
 
   // Helper to check if a card is favorited
   const isFavorited = (id: number, type: 'material' | 'upload') => {
@@ -463,9 +162,58 @@ export default function StudyMaterials() {
     }
   };
 
-  // Remove from favorites
-  const handleRemoveFavorite = (id: number, type: 'material' | 'upload') => {
-    setFavorites(prev => prev.filter(fav => !(fav.id === id && fav.type === type)));
+  // Remove from favorites (with backend call and loading state)
+  const [removingFavoriteId, setRemovingFavoriteId] = useState<number | null>(null);
+  const handleRemoveFavorite = async (id: number, type: 'material' | 'upload', folder_id?: string) => {
+    const userEmail = typeof window !== "undefined" ? (localStorage.getItem("Email") || "") : "";
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!userEmail) {
+      alert('No email found. Please log in.');
+      return;
+    }
+    if (!folder_id) {
+      alert('No folder_id found for this note.');
+      return;
+    }
+    setRemovingFavoriteId(id);
+    try {
+      const res = await fetch('http://localhost:9000/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          query: `mutation RemoveFromFavorites($email: String!, $folder_id: String!) { removeFromFavorites(email: $email, folder_id: $folder_id) }`,
+          variables: { email: userEmail, folder_id },
+        }),
+      });
+      if (res.status === 401) {
+        alert('You are not authorized. Please log in.');
+        setRemovingFavoriteId(null);
+        return;
+      }
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        alert('Server error: Invalid response.');
+        setRemovingFavoriteId(null);
+        return;
+      }
+      if (data?.data?.removeFromFavorites) {
+        setFavorites(prev => prev.filter(fav => !(fav.id === id && fav.type === type)));
+      } else if (data?.errors && data.errors[0]?.message) {
+        alert('Backend error: ' + data.errors[0].message);
+      } else {
+        alert('Unknown backend error.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error: Failed to remove from favorites');
+    } finally {
+      setRemovingFavoriteId(null);
+    }
   };
 
   // Pagination state
@@ -503,24 +251,8 @@ export default function StudyMaterials() {
           </Button>
         </div>
 
-        {/* Search and Filters */}
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search study materials, courses, or topics..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>              
-            </div>
-          </CardContent>
-        </Card>
+
+  {/* Tabs */}
 
         {/* Tabs */}
         <Tabs defaultValue="browse" className="w-full">
@@ -540,6 +272,20 @@ export default function StudyMaterials() {
           </TabsList>
 
           <TabsContent value="browse" className="space-y-6 mt-6">
+            {/* Search box only */}
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search study materials, course_code, or topics..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardContent>
+            </Card>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {paginate(materials, browsePage).map((material) => {
                 function formatDate(dateString: string) {
@@ -555,7 +301,7 @@ export default function StudyMaterials() {
                           <div className="flex-1 min-w-0">
                             <CardTitle className="text-lg leading-tight">{material.title}</CardTitle>
                             <CardDescription className="mt-1">
-                              {material.course} • {material.subject}
+                              {material.course_code} • {material.subject}
                             </CardDescription>
                           </div>
                         </div>
@@ -570,9 +316,8 @@ export default function StudyMaterials() {
                           <AvatarImage src={material.authorAvatar || "/placeholder.svg"} />
                           <AvatarFallback>
                             {material.author
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")}
+                              ? material.author.split(" ").map((n: string) => n[0]).join("")
+                              : "NA"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
@@ -580,13 +325,16 @@ export default function StudyMaterials() {
                           <p className="text-xs text-slate-500">
                             {material.university} • {formatDate(material.uploadDate)}
                           </p>
+                          <p className="text-xs text-slate-500">
+                            Uploader: {material.email || "Unknown"}
+                          </p>
                         </div>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {material.tags.map((tag: string, index: number) => (
+                        {Array.isArray(material.tags) && material.tags.map((tag: string, index: number) => (
                           <Badge key={index} variant="outline" className="text-xs">
-                            {tag}
+                            {typeof tag === 'string' ? tag.replace(/^["'{\[]+|["'}\]]+$/g, '') : tag}
                           </Badge>
                         ))}
                       </div>
@@ -609,7 +357,60 @@ export default function StudyMaterials() {
                           <Download className="h-4 w-4 mr-2" />
                           Download
                         </Button>
-                        <Button variant={isFavorited(material.id, 'material') ? "default" : "outline"} size="icon" className="bg-transparent" onClick={() => handleAddFavorite(material, 'material')}>
+                        {/* add to favorite button */}
+                        <Button
+                          variant={isFavorited(material.id, 'material') ? "default" : "outline"}
+                          size="icon"
+                          className="bg-transparent"
+                          onClick={async () => {
+                            if (!isFavorited(material.id, 'material')) {
+                              const userEmail = typeof window !== "undefined" ? (localStorage.getItem("Email") || "") : "";
+                              const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+                              if (!userEmail) {
+                                alert('No email found. Please log in.');
+                                return;
+                              }
+                              if (!material.folder_id) {
+                                alert('No folder_id found for this note.');
+                                return;
+                              }
+                              try {
+                                const res = await fetch('http://localhost:9000/graphql', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                  },
+                                  body: JSON.stringify({
+                                    query: `mutation AddToFavorites($email: String!, $folder_id: String!) { addToFavorites(email: $email, folder_id: $folder_id) { id email folder_id createdAt } }`,
+                                    variables: { email: userEmail, folder_id: material.folder_id },
+                                  }),
+                                });
+                                if (res.status === 401) {
+                                  alert('You are not authorized. Please log in.');
+                                  return;
+                                }
+                                let data = null;
+                                try {
+                                  data = await res.json();
+                                } catch (jsonErr) {
+                                  alert('Server error: Invalid response.');
+                                  return;
+                                }
+                                if (data?.data?.addToFavorites) {
+                                  handleAddFavorite(material, 'material');
+                                } else if (data?.errors && data.errors[0]?.message) {
+                                  alert('Backend error: ' + data.errors[0].message);
+                                } else {
+                                  alert('Unknown backend error.');
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                alert('Network error: Failed to add to favorites');
+                              }
+                            }
+                          }}
+                        >
                           <Star className={isFavorited(material.id, 'material') ? "h-4 w-4 text-yellow-500" : "h-4 w-4"} />
                         </Button>
                       </div>
@@ -644,17 +445,62 @@ export default function StudyMaterials() {
                           <div className="flex-1 min-w-0">
                             <CardTitle className="text-lg leading-tight">{upload.title}</CardTitle>
                             <CardDescription className="mt-1">
-                              {upload.course} • {upload.subject}
+                              {upload.course_code} • {upload.subject}
                             </CardDescription>
                           </div>
                         </div>
+                        {/* delete  my notes */}
                         <Button
                           variant="outline"
                           size="icon"
                           className="bg-transparent"
-                          onClick={() => setMyUploads((prev) => prev.filter((item) => item.id !== upload.id))}
+                          disabled={deletingId === upload.id}
+                          onClick={async () => {
+                            if (!upload.folder_id) {
+                              alert('No folder_id found for this note.');
+                              return;
+                            }
+                            setDeletingId(upload.id);
+                            try {
+                              const token = localStorage.getItem("token");
+                              const res = await fetch('http://localhost:9000/notes', {
+                                method: 'DELETE',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                },
+                                body: JSON.stringify({ folderId: upload.folder_id }),
+                              });
+                              if (res.ok) {
+                                const data = await res.json();
+                                if (data.success) {
+                                  // Refresh uploads from backend after delete
+                                  fetchUploads();
+                                } else {
+                                  alert('Delete failed: ' + (data.message || 'Unknown error'));
+                                }
+                              } else if (res.status === 401) {
+                                alert('You are not authorized. Please log in.');
+                              } else {
+                                let message = 'Unknown error';
+                                try {
+                                  const data = await res.json();
+                                  message = data.message || message;
+                                } catch {}
+                                alert('Delete failed: ' + message);
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert('Network error: Failed to delete note.');
+                            } finally {
+                              setDeletingId(null);
+                            }
+                          }}
                         >
                           <Trash className="h-4 w-4 text-red-500" />
+                          {deletingId === upload.id && (
+                            <span className="ml-2 animate-spin h-4 w-4 border-2 border-t-transparent border-red-500 rounded-full inline-block align-middle"></span>
+                          )}
                         </Button>
                       </div>
                     </CardHeader>
@@ -670,7 +516,7 @@ export default function StudyMaterials() {
                       <div className="flex flex-wrap gap-2">
                         {upload.tags?.map((tag: string, index: number) => (
                           <Badge key={index} variant="outline" className="text-xs">
-                            {tag}
+                            {typeof tag === 'string' ? tag.replace(/^["'{\[]+|["'}\]]+$/g, '') : tag}
                           </Badge>
                         ))}
                       </div>
@@ -721,7 +567,7 @@ export default function StudyMaterials() {
                           <div className="flex-1 min-w-0">
                             <CardTitle className="text-lg leading-tight">{fav.title}</CardTitle>
                             <CardDescription className="mt-1">
-                              {fav.course} • {fav.subject}
+                              {fav.course_code} • {fav.subject}
                             </CardDescription>
                           </div>
                         </div>
@@ -733,10 +579,7 @@ export default function StudyMaterials() {
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={fav.authorAvatar || "/placeholder.svg"} />
                           <AvatarFallback>
-                            {fav.author
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")}
+                            {(fav.author ? fav.author.split(" ").map((n: string) => n[0]).join("") : "NA")}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
@@ -747,15 +590,23 @@ export default function StudyMaterials() {
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {fav.tags.map((tag: string, index: number) => (
+                        {Array.isArray(fav.tags) && fav.tags.map((tag: string, index: number) => (
                           <Badge key={index} variant="outline" className="text-xs">
-                            {tag}
+                            {typeof tag === 'string' ? tag.replace(/^["'{\[]+|["'}\]]+$/g, '') : tag}
                           </Badge>
                         ))}
                       </div>
                       <div className="flex gap-2 pt-2">
-                        <Button variant="destructive" size="sm" onClick={() => handleRemoveFavorite(fav.id, fav.type)}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={removingFavoriteId === fav.id}
+                          onClick={() => handleRemoveFavorite(fav.id, fav.type, fav.folder_id)}
+                        >
                           Remove from Favorites
+                          {removingFavoriteId === fav.id && (
+                            <span className="ml-2 animate-spin h-4 w-4 border-2 border-t-transparent border-white rounded-full inline-block align-middle"></span>
+                          )}
                         </Button>
                       </div>
                     </CardContent>

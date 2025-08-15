@@ -1,5 +1,5 @@
 "use client"
-
+import { useEffect } from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -72,6 +72,26 @@ const menuItems = [
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
+  const [studentHi, setStudentHi] = useState<string>("");
+  // Fetch /student/hi on mount and every 60s
+  useEffect(() => {
+    let active = true;
+    async function fetchHi() {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const res = await fetch("http://localhost:9000/student/hi", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await res.text();
+        if (active) setStudentHi(data);
+      } catch {
+        if (active) setStudentHi("");
+      }
+    }
+    fetchHi();
+    const interval = setInterval(fetchHi, 60000);
+    return () => { active = false; clearInterval(interval); };
+  }, []);
 
   return (
     <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-slate-200 shadow-sm">
@@ -138,7 +158,7 @@ export function Navbar() {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">John Doe</p>
+                    <p className="text-sm font-medium leading-none">{studentHi ? studentHi : "not logged in"}</p>
                     <p className="text-xs leading-none text-muted-foreground">john.doe@university.edu</p>
                   </div>
                 </DropdownMenuLabel>
@@ -157,8 +177,20 @@ export function Navbar() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Log out
+                  <button
+                    className="flex items-center gap-2 text-red-600 w-full bg-transparent border-none p-0 m-0 cursor-pointer"
+                    onClick={() => {
+                      // Clear tokens if stored
+                      if (typeof window !== "undefined") {
+                        localStorage.removeItem("token");
+                        sessionStorage.removeItem("token");
+                      }
+                      window.location.href = "/";
+                    }}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Log out
+                  </button>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

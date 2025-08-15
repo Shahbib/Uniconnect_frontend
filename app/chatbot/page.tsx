@@ -19,21 +19,31 @@ interface Message {
 }
 
 export default function AIChatbot() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      content:
-        "Hi! I'm your AI study assistant. I have access to all your notes, skills, and achievements. How can I help you today?",
-      sender: "bot",
-      timestamp: new Date(),
-      suggestions: [
-        "Explain my Data Structures notes",
-        "Quiz me on Machine Learning",
-        "Suggest skills to learn next",
-        "Help with my project",
-      ],
-    },
-  ])
+  const defaultWelcome: Message = {
+    id: 1,
+    content:
+      "Hi! I'm your AI study assistant. I have access to all your notes, skills, and achievements. How can I help you today?",
+    sender: "bot",
+    timestamp: new Date(),
+    suggestions: [
+      "Explain my Data Structures notes",
+      "Quiz me on Machine Learning",
+      "Suggest skills to learn next",
+      "Help with my project",
+    ],
+  };
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("chatbot_messages");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved).map((msg: any) => ({ ...msg, timestamp: new Date(msg.timestamp) }));
+          return parsed;
+        } catch {}
+      }
+    }
+    return [defaultWelcome];
+  });
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -43,81 +53,68 @@ export default function AIChatbot() {
   }
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    scrollToBottom();
+    // Save messages to localStorage on change
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chatbot_messages", JSON.stringify(messages));
+    }
+  }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
+    if (!inputMessage.trim()) return;
 
     const userMessage: Message = {
       id: messages.length + 1,
       content: inputMessage,
       sender: "user",
       timestamp: new Date(),
-    }
+    };
 
-    setMessages((prev) => [...prev, userMessage])
-    setInputMessage("")
-    setIsTyping(true)
+    setMessages((prev) => [...prev, userMessage]);
+    setInputMessage("");
+    setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const botResponse: Message = {
+    // Send message to backend /chat API
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch("http://localhost:9000/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ query: inputMessage, thread_id: "thread_123456" })
+      });
+      const data = await res.json();
+      if (data.response) {
+        const botResponse: Message = {
+          id: messages.length + 2,
+          content: data.response,
+          sender: "bot",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, botResponse]);
+      } else {
+        const errorResponse: Message = {
+          id: messages.length + 2,
+          content: data.message || "Failed to get response from AI agent.",
+          sender: "bot",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorResponse]);
+      }
+    } catch (err) {
+      const errorResponse: Message = {
         id: messages.length + 2,
-        content: generateBotResponse(inputMessage),
+        content: "Network error. Please try again.",
         sender: "bot",
         timestamp: new Date(),
-        suggestions: generateSuggestions(inputMessage),
-      }
-      setMessages((prev) => [...prev, botResponse])
-      setIsTyping(false)
-    }, 1500)
+      };
+      setMessages((prev) => [...prev, errorResponse]);
+    }
+    setIsTyping(false);
   }
 
-  const generateBotResponse = (input: string): string => {
-    const lowerInput = input.toLowerCase()
-
-    if (lowerInput.includes("data structures")) {
-      return "Based on your Data Structures notes, I can see you've covered arrays, linked lists, and trees. Your notes show strong understanding of time complexity analysis. Would you like me to create a quiz on binary trees or explain any specific concept in more detail?"
-    }
-
-    if (lowerInput.includes("machine learning") || lowerInput.includes("ml")) {
-      return "I see you've been working on machine learning projects! Your notes cover supervised learning algorithms like linear regression and decision trees. Your recent sentiment analysis project achieved 94% accuracy - impressive! What specific ML topic would you like to explore further?"
-    }
-
-    if (lowerInput.includes("skills") || lowerInput.includes("learn")) {
-      return "Based on your current skill set (JavaScript, React, Python) and your interest in AI/ML, I recommend focusing on: 1) Deep Learning frameworks like TensorFlow or PyTorch, 2) Cloud platforms (AWS/GCP), 3) System Design principles. Which area interests you most?"
-    }
-
-    if (lowerInput.includes("project")) {
-      return "Looking at your profile, you have experience with web development and machine learning. For your next project, consider: 1) A full-stack ML application, 2) Contributing to open-source projects, 3) Building a portfolio website. What type of project are you thinking about?"
-    }
-
-    return (
-      "I understand you're asking about '" +
-      input +
-      "'. Based on your learning history and notes, I can provide personalized guidance. Could you be more specific about what you'd like to know or learn?"
-    )
-  }
-
-  const generateSuggestions = (input: string): string[] => {
-    const lowerInput = input.toLowerCase()
-
-    if (lowerInput.includes("data structures")) {
-      return [
-        "Create a binary tree quiz",
-        "Explain graph algorithms",
-        "Compare sorting algorithms",
-        "Practice coding problems",
-      ]
-    }
-
-    if (lowerInput.includes("machine learning")) {
-      return ["Explain neural networks", "Compare ML algorithms", "Suggest ML projects", "Review your ML notes"]
-    }
-
-    return ["Show my learning progress", "Suggest study schedule", "Find related resources", "Create practice quiz"]
-  }
 
   const handleSuggestionClick = (suggestion: string) => {
     setInputMessage(suggestion)
