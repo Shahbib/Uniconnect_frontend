@@ -110,6 +110,30 @@ export default function StudyMaterials() {
   const [myUploads, setMyUploads] = useState<Upload[]>([])
   const [favorites, setFavorites] = useState<any[]>([])
 
+  // Fetch favorite notes from backend
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch("http://localhost:9000/graphql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          query: `query { getFavoriteNotes { id email title subject course_code tags description folder_id urls createdAt isFavorite score feedback } }`,
+        }),
+      });
+      const data = await res.json();
+      if (data?.data?.getFavoriteNotes) {
+        setFavorites(data.data.getFavoriteNotes);
+      } else {
+        setFavorites([]);
+      }
+    };
+    fetchFavorites();
+  }, []);
+
   // Material type is not used directly, so removed for brevity
   const [deletingId, setDeletingId] = useState<number | null>(null);
   // Helper to fetch uploads (for refresh)
@@ -150,9 +174,10 @@ export default function StudyMaterials() {
   fetchUploads();
   };
 
-  // Helper to check if a card is favorited
-  const isFavorited = (id: number, type: 'material' | 'upload') => {
-    return favorites.some(fav => fav.id === id && fav.type === type);
+  // Helper to check if a card is favorited (by backend favorites)
+  const isFavorited = (id: number, type: 'material' | 'upload', folder_id?: string) => {
+    // For backend favorites, match by folder_id if available, else by id
+    return favorites.some(fav => (folder_id ? fav.folder_id === folder_id : fav.id === id));
   };
 
   // Add to favorites
@@ -359,11 +384,16 @@ export default function StudyMaterials() {
                         </Button>
                         {/* add to favorite button */}
                         <Button
-                          variant={isFavorited(material.id, 'material') ? "default" : "outline"}
+                          variant={isFavorited(material.id, 'material', material.folder_id) ? "default" : "outline"}
                           size="icon"
-                          className="bg-transparent"
+                          className={
+                            "bg-transparent" +
+                            (isFavorited(material.id, 'material', material.folder_id)
+                              ? " animate-pulse"
+                              : "")
+                          }
                           onClick={async () => {
-                            if (!isFavorited(material.id, 'material')) {
+                            if (!isFavorited(material.id, 'material', material.folder_id)) {
                               const userEmail = typeof window !== "undefined" ? (localStorage.getItem("Email") || "") : "";
                               const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
                               if (!userEmail) {
@@ -598,9 +628,24 @@ export default function StudyMaterials() {
                       </div>
                       <div className="flex gap-2 pt-2">
                         <Button
+                          variant="secondary"
+                          size="sm"
+                          asChild
+                          disabled={fav.deleted === true || fav.exists === false || !fav.urls || fav.urls.length === 0}
+                        >
+                          <a
+                            href={fav.urls && fav.urls.length > 0 ? fav.urls[0] : undefined}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Download
+                          </a>
+                        </Button>
+                        <Button
                           variant="destructive"
                           size="sm"
-                          disabled={removingFavoriteId === fav.id}
+                          disabled={removingFavoriteId === fav.id || fav.deleted === true || fav.exists === false}
                           onClick={() => handleRemoveFavorite(fav.id, fav.type, fav.folder_id)}
                         >
                           Remove from Favorites
@@ -608,6 +653,9 @@ export default function StudyMaterials() {
                             <span className="ml-2 animate-spin h-4 w-4 border-2 border-t-transparent border-white rounded-full inline-block align-middle"></span>
                           )}
                         </Button>
+                        {(fav.deleted === true || fav.exists === false) && (
+                          <span className="text-red-500 font-semibold ml-2">Deleted by uploader</span>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
