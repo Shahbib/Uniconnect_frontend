@@ -169,7 +169,8 @@ export default function ProfilePage() {
                     id="email"
                     type="email"
                     value={profileData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
+                    readOnly
+                    className="bg-gray-100 cursor-not-allowed"
                   />
                 </div>
 
@@ -259,7 +260,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="github">GitHub Username</Label>
+                    <Label htmlFor="github">GitHub URL</Label>
                     <Input
                       id="github"
                       placeholder="username"
@@ -268,10 +269,10 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="linkedin">LinkedIn Username</Label>
+                    <Label htmlFor="linkedin">LinkedIn URL</Label>
                     <Input
                       id="linkedin"
-                      placeholder="username"
+                      placeholder="https://linkedin.com/in/username"
                       value={profileData.linkedin}
                       onChange={(e) => handleInputChange("linkedin", e.target.value)}
                     />

@@ -73,6 +73,7 @@ export default function ResidenceFinder() {
     description: string;
     availableFrom: string;
     lookingFor: string;
+    contactDetails: string;
   }>({
     title: "",
     location: "",
@@ -87,6 +88,7 @@ export default function ResidenceFinder() {
     description: "",
     availableFrom: "",
     lookingFor: "",
+    contactDetails: "",
   })
   const [searchLocation, setSearchLocation] = useState("")
   const [priceSort, setPriceSort] = useState("")
@@ -443,14 +445,12 @@ export default function ResidenceFinder() {
                     description: "",
                     availableFrom: "",
                     lookingFor: "",
+                    contactDetails: "",
                   });
                 }}
                 className="space-y-4"
               >
-                <div>
-                  <label className="block font-semibold mb-1">Title</label>
-                  <input className="w-full border rounded px-3 py-2" required placeholder="Title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-                </div>
+                
                 <div>
                   <label className="block font-semibold mb-1">Location</label>
                   <input className="w-full border rounded px-3 py-2" required placeholder="Location" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
@@ -460,33 +460,8 @@ export default function ResidenceFinder() {
                   <input className="w-full border rounded px-3 py-2" required placeholder="Nearest University" value={form.university} onChange={e => setForm(f => ({ ...f, university: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Distance</label>
-                  <input className="w-full border rounded px-3 py-2" required placeholder="Distance (e.g. 0.5 miles from MIT)" value={form.distance} onChange={e => setForm(f => ({ ...f, distance: e.target.value }))} />
-                </div>
-                <div>
                   <label className="block font-semibold mb-1">Price</label>
                   <input className="w-full border rounded px-3 py-2" required type="number" min="0" placeholder="Price" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Type</label>
-                  <select className="w-full border rounded px-3 py-2" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                    <option>Apartment</option>
-                    <option>House</option>
-                    <option>Studio</option>
-                    <option>Room</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Bedroom Number</label>
-                  <input className="w-full border rounded px-3 py-2" required type="number" min="0" placeholder="Bedroom Number" value={form.bedrooms} onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Bathroom Number</label>
-                  <input className="w-full border rounded px-3 py-2" required type="number" min="0" placeholder="Bathroom Number" value={form.bathrooms} onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Amenities (comma separated)</label>
-                  <input className="w-full border rounded px-3 py-2" placeholder="Amenities (comma separated)" value={form.amenities} onChange={e => setForm(f => ({ ...f, amenities: e.target.value }))} />
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">Image</label>
@@ -504,8 +479,8 @@ export default function ResidenceFinder() {
                   <input className="w-full border rounded px-3 py-2" required type="date" placeholder="Available Date" value={form.availableFrom} onChange={e => setForm(f => ({ ...f, availableFrom: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Looking For</label>
-                  <input className="w-full border rounded px-3 py-2" placeholder="Looking For" value={form.lookingFor} onChange={e => setForm(f => ({ ...f, lookingFor: e.target.value }))} />
+                  <label className="block font-semibold mb-1">Contact details</label>
+                  <input className="w-full border rounded px-3 py-2" placeholder="Contact details" value={form.contactDetails} onChange={e => setForm(f => ({ ...f, contactDetails: e.target.value }))} />
                 </div>
                 <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 font-semibold">Post Listing</button>
               </form>
@@ -575,7 +550,7 @@ export default function ResidenceFinder() {
               {([...listings]
                 .filter(listing => {
                   const typeMatch = selectedType === "all" || listing.type === selectedType;
-                  const universityMatch = !universitySearch || listing.university.toLowerCase() === universitySearch.toLowerCase();
+                  const universityMatch = !universitySearch || listing.university.toLowerCase().includes(universitySearch.toLowerCase());
                   return typeMatch && universityMatch;
                 })
                 .sort((a, b) => {
