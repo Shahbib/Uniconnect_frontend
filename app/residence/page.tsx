@@ -25,6 +25,9 @@ import {
 import { Navbar } from "@/components/navbar"
 
 export default function ResidenceFinder() {
+  // Local pagination state for tabs
+  const [browsePage, setBrowsePage] = useState(1);
+  const [myListingPage, setMyListingPage] = useState(1);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [myListings, setMyListings] = useState<Listing[]>([]);
@@ -390,8 +393,9 @@ export default function ResidenceFinder() {
           </TabsList>
 
           <TabsContent value="listings" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {listings
+            {/* Pagination logic for Browse Listings tab */}
+            {(() => {
+              const filtered = listings
                 .filter(listing => {
                   const typeMatch = selectedType === "all" || listing.type === selectedType;
                   const universityMatch = !universitySearch || listing.university.toLowerCase().includes(universitySearch.toLowerCase());
@@ -401,61 +405,79 @@ export default function ResidenceFinder() {
                   if (priceSort === "low") return Number(a.price) - Number(b.price);
                   if (priceSort === "high") return Number(b.price) - Number(a.price);
                   return 0;
-                })
-                .map((listing) => (
-                  <Card key={listing.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                    <div className="relative">
-                      <img
-                        src={listing.images[0] || "/placeholder.svg"}
-                        alt={listing.title}
-                        className="w-full h-48 object-cover rounded-t-lg"
-                      />
-                      {listing.verified && <Badge className="absolute top-3 right-3 bg-green-500">Verified</Badge>}
-                      <div className="absolute bottom-3 left-3">
-                        <Badge className="bg-black/70 text-white">${listing.price}/month</Badge>
-                      </div>
-                    </div>
-                    <CardContent className="p-6 space-y-4">
-                      <div>
-                        <div className="flex items-center gap-2 text-sm text-slate-600 mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {listing.location} {listing.distance ? `• ${listing.distance}` : ""}
-                        </div>
-                      </div>
-                      <p className="text-sm text-slate-700 leading-relaxed">{listing.description}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={listing.ownerAvatar || "/placeholder.svg"} />
-                            <AvatarFallback>
-                              {listing.owner.split(" ").map((n) => n[0]).join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">{listing.owner}</p>
-                            <p className="text-xs text-slate-500">{listing.university}</p>
+                });
+              const CARDS_PER_PAGE = 8;
+              const totalPages = Math.max(1, Math.ceil(filtered.length / CARDS_PER_PAGE));
+              const paginated = filtered.slice((browsePage - 1) * CARDS_PER_PAGE, browsePage * CARDS_PER_PAGE);
+              return (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {paginated.map((listing) => (
+                      <Card key={listing.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                        <div className="relative">
+                          <img
+                            src={listing.images[0] || "/placeholder.svg"}
+                            alt={listing.title}
+                            className="w-full h-48 object-cover rounded-t-lg"
+                          />
+                          {listing.verified && <Badge className="absolute top-3 right-3 bg-green-500">Verified</Badge>}
+                          <div className="absolute bottom-3 left-3">
+                            <Badge className="bg-black/70 text-white">${listing.price}/month</Badge>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        <p>
-                          <strong>Available:</strong> {listing.availableFrom}
-                        </p>
-                      </div>
-                      <div className="flex gap-2 pt-2">
-                        <Button 
-                          className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                          onClick={() => {
-                            setContactModal({ open: true, contact: listing.contactDetail });
-                          }}
-                        >
-                          Contact Owner
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-            </div>
+                        <CardContent className="p-6 space-y-4">
+                          <div>
+                            <div className="flex items-center gap-2 text-sm text-slate-600 mt-1">
+                              <MapPin className="h-4 w-4" />
+                              {listing.location} {listing.distance ? `• ${listing.distance}` : ""}
+                            </div>
+                          </div>
+                          <p className="text-sm text-slate-700 leading-relaxed">{listing.description}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={listing.ownerAvatar || "/placeholder.svg"} />
+                                <AvatarFallback>
+                                  {listing.owner.split(" ").map((n) => n[0]).join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{listing.owner}</p>
+                                <p className="text-xs text-slate-500">{listing.university}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-sm text-slate-600">
+                            <p>
+                              <strong>Available:</strong> {listing.availableFrom}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <Button 
+                              className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                              onClick={() => {
+                                setContactModal({ open: true, contact: listing.contactDetail });
+                              }}
+                            >
+                              Contact Owner
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex justify-center items-center gap-2 mt-6">
+                      <Button disabled={browsePage === 1} onClick={() => setBrowsePage(browsePage - 1)}>Previous</Button>
+                      {[...Array(totalPages)].map((_, i) => (
+                        <Button key={i} variant={browsePage === i + 1 ? "default" : "outline"} onClick={() => setBrowsePage(i + 1)}>{i + 1}</Button>
+                      ))}
+                      <Button disabled={browsePage === totalPages} onClick={() => setBrowsePage(browsePage + 1)}>Next</Button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </TabsContent>
 
 
@@ -469,8 +491,8 @@ export default function ResidenceFinder() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {myListings
+              (() => {
+                const filtered = myListings
                   .filter(listing => {
                     return !universitySearch || (listing.university && listing.university.toLowerCase().includes(universitySearch.toLowerCase()));
                   })
@@ -478,84 +500,102 @@ export default function ResidenceFinder() {
                     if (priceSort === "low") return Number(a.price) - Number(b.price);
                     if (priceSort === "high") return Number(b.price) - Number(a.price);
                     return 0;
-                  })
-                  .map((listing) => (
-                    <Card key={listing.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                      <div className="relative">
-                        <img
-                          src={listing.images[0] || "/placeholder.svg"}
-                          alt={listing.title}
-                          className="w-full h-48 object-cover rounded-t-lg"
-                        />
-                        <button
-                          className="absolute top-3 right-3 bg-red-500 text-white rounded-full p-2 shadow hover:bg-red-600 transition"
-                          title="Delete Listing"
-                          disabled={deletingId === listing.id}
-                          onClick={() => {
-                            setDeletingId(listing.id);
-                            const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
-                            fetch(`http://localhost:9000/roommate/${listing.id}`, {
-                              method: "DELETE",
-                              headers: {
-                                Authorization: `Bearer ${token}`
-                              }
-                            })
-                            .then(res => {
-                              if (res.ok) {
-                                setMyListings(prev => prev.filter(l => l.id !== listing.id));
-                              } else {
-                                alert("Failed to delete listing.");
-                              }
-                            })
-                            .catch(() => {
-                              alert("Failed to delete listing.");
-                            })
-                            .finally(() => {
-                              setDeletingId(null);
-                            });
-                          }}
-                        >
-                          {deletingId === listing.id ? (
-                            <span className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block animate-spin"></span>
-                          ) : (
-                            <span>&#10005;</span>
-                          )}
-                        </button>
-                        <div className="absolute bottom-3 left-3">
-                          <Badge className="bg-black/70 text-white">${listing.price}/month</Badge>
-                        </div>
-                      </div>
-                      <CardContent className="p-6 space-y-4">
-                        <div>
-                          <div className="flex items-center gap-2 text-sm text-slate-600 mt-1">
-                            <MapPin className="h-4 w-4" />
-                            {listing.location} {listing.distance ? `• ${listing.distance}` : ""}
-                          </div>
-                        </div>
-                        <p className="text-sm text-slate-700 leading-relaxed">{listing.description}</p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={listing.ownerAvatar || "/placeholder.svg"} />
-                              <AvatarFallback>
-                                {listing.owner.split(" ").map((n) => n[0]).join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="text-sm font-medium">{listing.owner}</p>
-                              <p className="text-xs text-slate-500">{listing.university}</p>
+                  });
+                const CARDS_PER_PAGE = 8;
+                const totalPages = Math.max(1, Math.ceil(filtered.length / CARDS_PER_PAGE));
+                const paginated = filtered.slice((myListingPage - 1) * CARDS_PER_PAGE, myListingPage * CARDS_PER_PAGE);
+                return (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {paginated.map((listing) => (
+                        <Card key={listing.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                          <div className="relative">
+                            <img
+                              src={listing.images[0] || "/placeholder.svg"}
+                              alt={listing.title}
+                              className="w-full h-48 object-cover rounded-t-lg"
+                            />
+                            <button
+                              className="absolute top-3 right-3 bg-red-500 text-white rounded-full p-2 shadow hover:bg-red-600 transition"
+                              title="Delete Listing"
+                              disabled={deletingId === listing.id}
+                              onClick={() => {
+                                setDeletingId(listing.id);
+                                const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+                                fetch(`http://localhost:9000/roommate/${listing.id}`, {
+                                  method: "DELETE",
+                                  headers: {
+                                    Authorization: `Bearer ${token}`
+                                  }
+                                })
+                                .then(res => {
+                                  if (res.ok) {
+                                    setMyListings(prev => prev.filter(l => l.id !== listing.id));
+                                  } else {
+                                    alert("Failed to delete listing.");
+                                  }
+                                })
+                                .catch(() => {
+                                  alert("Failed to delete listing.");
+                                })
+                                .finally(() => {
+                                  setDeletingId(null);
+                                });
+                              }}
+                            >
+                              {deletingId === listing.id ? (
+                                <span className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block animate-spin"></span>
+                              ) : (
+                                <span>&#10005;</span>
+                              )}
+                            </button>
+                            <div className="absolute bottom-3 left-3">
+                              <Badge className="bg-black/70 text-white">${listing.price}/month</Badge>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-sm text-slate-600">                    
-                          <p>
-                            <strong>Available:</strong> {listing.availableFrom}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-              </div>
+                          <CardContent className="p-6 space-y-4">
+                            <div>
+                              <div className="flex items-center gap-2 text-sm text-slate-600 mt-1">
+                                <MapPin className="h-4 w-4" />
+                                {listing.location} {listing.distance ? `• ${listing.distance}` : ""}
+                              </div>
+                            </div>
+                            <p className="text-sm text-slate-700 leading-relaxed">{listing.description}</p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={listing.ownerAvatar || "/placeholder.svg"} />
+                                  <AvatarFallback>
+                                    {listing.owner.split(" ").map((n) => n[0]).join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="text-sm font-medium">{listing.owner}</p>
+                                  <p className="text-xs text-slate-500">{listing.university}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-sm text-slate-600">                    
+                              <p>
+                                <strong>Available:</strong> {listing.availableFrom}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex justify-center items-center gap-2 mt-6">
+                        <Button disabled={myListingPage === 1} onClick={() => setMyListingPage(myListingPage - 1)}>Previous</Button>
+                        {[...Array(totalPages)].map((_, i) => (
+                          <Button key={i} variant={myListingPage === i + 1 ? "default" : "outline"} onClick={() => setMyListingPage(i + 1)}>{i + 1}</Button>
+                        ))}
+                        <Button disabled={myListingPage === totalPages} onClick={() => setMyListingPage(myListingPage + 1)}>Next</Button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()
             )}
           </TabsContent>
         </Tabs>
