@@ -1,6 +1,5 @@
 "use client"
-
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,6 +13,13 @@ import { Camera, Save, User, Settings, Trophy, BookOpen, Users } from "lucide-re
 import { Navbar } from "@/components/navbar"
 
 export default function ProfilePage() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [profilePicUrl, setProfilePicUrl] = useState("/placeholder.svg?height=96&width=96");
+  const [uploading, setUploading] = useState(false);
+  const [showSkillInput, setShowSkillInput] = useState(false);
+  const [newSkill, setNewSkill] = useState("");
+  const [showInterestInput, setShowInterestInput] = useState(false);
+  const [newInterest, setNewInterest] = useState("");
   const [profileData, setProfileData] = useState({
     firstName: "John",
     lastName: "Doe",
@@ -26,7 +32,19 @@ export default function ProfilePage() {
     website: "https://johndoe.dev",
     github: "johndoe",
     linkedin: "john-doe",
-  })
+  });
+
+  // Store profile data and picture in localStorage on change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("profileData", JSON.stringify(profileData));
+    }
+  }, [profileData]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("profilePicUrl", profilePicUrl);
+    }
+  }, [profilePicUrl]);
 
   const [skills, setSkills] = useState([
     "JavaScript",
@@ -124,14 +142,52 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="flex items-center gap-6">
                 <Avatar className="h-24 w-24 ring-4 ring-blue-200">
-                  <AvatarImage src="/placeholder.svg?height=96&width=96" />
+                  <AvatarImage src={profilePicUrl} />
                   <AvatarFallback className="text-2xl">JD</AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
-                  <Button className="bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600">
+                  <Button
+                    className="bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 relative"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
                     <Camera className="h-4 w-4 mr-2" />
-                    Change Picture
+                    {uploading ? "Uploading..." : "Change Picture"}
                   </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    ref={fileInputRef}
+                    onChange={async (e) => {
+                      const file = e.target.files && e.target.files[0];
+                      if (!file) return;
+                      setUploading(true);
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      try {
+                        const token = localStorage.getItem("token");
+                        const res = await fetch("http://localhost:9000/student/profile-picture", {
+                          method: "POST",
+                          headers: {
+                            Authorization: `Bearer ${token}`
+                          },
+                          body: formData
+                        });
+                        const data = await res.json();
+                        if (data.success && data.user && data.user.profilePictureUrl) {
+                          setProfilePicUrl(data.user.profilePictureUrl);
+                        } else {
+                          alert(data.message || "Failed to upload profile picture");
+                        }
+                      } catch (err) {
+                        alert("Error uploading profile picture");
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                  />
                   <p className="text-sm text-slate-500">JPG, PNG or GIF. Max size 2MB.</p>
                 </div>
               </CardContent>
@@ -164,6 +220,25 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="userName">User Name</Label>
+                    <Input
+                      id="userName"
+                      value={profileData.firstName + ' ' + profileData.lastName}
+                      readOnly
+                      className="bg-gray-100 cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="universityEmail">University Email</Label>
+                    <Input
+                      id="universityEmail"
+                      type="email"
+                      value={profileData.email}
+                      readOnly
+                      className="bg-gray-100 cursor-not-allowed"
+                    />
+                  </div>
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -185,10 +260,9 @@ export default function ProfilePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="MIT">MIT</SelectItem>
-                        <SelectItem value="Stanford">Stanford University</SelectItem>
-                        <SelectItem value="Harvard">Harvard University</SelectItem>
-                        <SelectItem value="Berkeley">UC Berkeley</SelectItem>
+                        <SelectItem value="DU">DU</SelectItem>
+                        <SelectItem value="RMSTU">RMSTU</SelectItem>
+                        <SelectItem value="UIU">UIU</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -202,23 +276,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="year">Academic Year</Label>
-                    <Select value={profileData.year} onValueChange={(value) => handleInputChange("year", value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Freshman">Freshman</SelectItem>
-                        <SelectItem value="Sophomore">Sophomore</SelectItem>
-                        <SelectItem value="Junior">Junior</SelectItem>
-                        <SelectItem value="Senior">Senior</SelectItem>
-                        <SelectItem value="Graduate">Graduate</SelectItem>
-                        <SelectItem value="PhD">PhD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="location">Location</Label>
                     <Input
@@ -297,9 +355,43 @@ export default function ProfilePage() {
                       </Badge>
                     ))}
                   </div>
-                  <Button variant="outline" className="mt-3 bg-transparent">
-                    Add Skill
-                  </Button>
+                  <button
+                    type="button"
+                    className="mt-3 ml-1 inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white hover:bg-blue-600 focus:outline-none"
+                    onClick={() => setShowSkillInput((v) => !v)}
+                    title="Add Skill"
+                  >
+                    <span className="text-xl leading-none">+</span>
+                  </button>
+                  {showSkillInput && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        className="border rounded px-2 py-1 text-sm"
+                        placeholder="Enter skill"
+                        value={newSkill}
+                        autoFocus
+                        onChange={e => setNewSkill(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && newSkill.trim()) {
+                            setSkills(prev => [...prev, newSkill.trim()]);
+                            setNewSkill("");
+                            setShowSkillInput(false);
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (newSkill.trim()) {
+                            setSkills(prev => [...prev, newSkill.trim()]);
+                            setNewSkill("");
+                            setShowSkillInput(false);
+                          }
+                        }}
+                      >Add</Button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -311,9 +403,43 @@ export default function ProfilePage() {
                       </Badge>
                     ))}
                   </div>
-                  <Button variant="outline" className="mt-3 bg-transparent">
-                    Add Interest
-                  </Button>
+                  <button
+                    type="button"
+                    className="mt-3 ml-1 inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white hover:bg-blue-600 focus:outline-none"
+                    onClick={() => setShowInterestInput((v) => !v)}
+                    title="Add Interest"
+                  >
+                    <span className="text-xl leading-none">+</span>
+                  </button>
+                  {showInterestInput && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        className="border rounded px-2 py-1 text-sm"
+                        placeholder="Enter interest"
+                        value={newInterest}
+                        autoFocus
+                        onChange={e => setNewInterest(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && newInterest.trim()) {
+                            setInterests(prev => [...prev, newInterest.trim()]);
+                            setNewInterest("");
+                            setShowInterestInput(false);
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (newInterest.trim()) {
+                            setInterests(prev => [...prev, newInterest.trim()]);
+                            setNewInterest("");
+                            setShowInterestInput(false);
+                          }
+                        }}
+                      >Add</Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

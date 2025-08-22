@@ -1,6 +1,5 @@
 "use client"
-import { useEffect } from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -73,24 +72,27 @@ export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const [studentHi, setStudentHi] = useState<string>("");
-  // Fetch /student/hi on mount and every 60s
+  // Get profile info from localStorage
+  const [profileInfo, setProfileInfo] = useState<{name: string, email: string, pic: string}>({name: "", email: "", pic: "/placeholder.svg?height=40&width=40"});
   useEffect(() => {
-    let active = true;
-    async function fetchHi() {
-      try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        const res = await fetch("http://localhost:9000/student/hi", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        const data = await res.text();
-        if (active) setStudentHi(data);
-      } catch {
-        if (active) setStudentHi("");
+    if (typeof window !== "undefined") {
+      const pd = localStorage.getItem("profileData");
+      const pic = localStorage.getItem("profilePicUrl") || "/placeholder.svg?height=40&width=40";
+      if (pd) {
+        try {
+          const obj = JSON.parse(pd);
+          setProfileInfo({
+            name: (obj.firstName || "") + (obj.lastName ? " " + obj.lastName : ""),
+            email: obj.email || "",
+            pic: pic
+          });
+        } catch {
+          setProfileInfo({name: "", email: "", pic});
+        }
+      } else {
+        setProfileInfo({name: "", email: "", pic});
       }
     }
-    fetchHi();
-    const interval = setInterval(fetchHi, 60000);
-    return () => { active = false; clearInterval(interval); };
   }, []);
 
   return (
@@ -150,16 +152,16 @@ export function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10 ring-2 ring-blue-200">
-                    <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Profile" />
-                    <AvatarFallback>JD</AvatarFallback>
+                    <AvatarImage src={profileInfo.pic} alt="Profile" />
+                    <AvatarFallback>{profileInfo.name ? profileInfo.name.split(" ").map(n => n[0]).join("") : "U"}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{studentHi ? studentHi : "not logged in"}</p>
-                    <p className="text-xs leading-none text-muted-foreground">john.doe@university.edu</p>
+                    <p className="text-sm font-medium leading-none">{profileInfo.name || "not logged in"}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{profileInfo.email || ""}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
