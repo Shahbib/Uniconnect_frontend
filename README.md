@@ -21,8 +21,6 @@ A comprehensive platform for university students to connect, learn, and grow tog
 - **Lucide React** - Beautiful icons
 
 ### Backend API
-- **Node.js** - JavaScript runtime
-- **Express.js** - Web framework
 - **CORS** - Cross-origin resource sharing
 - **Helmet** - Security middleware
 - **Morgan** - HTTP request logger
