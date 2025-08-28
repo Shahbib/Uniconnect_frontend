@@ -17,12 +17,26 @@ export default function LearningDashboard() {
   const [activeTab, setActiveTab] = useState("tests")
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSubject, setSelectedSubject] = useState("all")
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Reset page when filters change
+  function handleSearchChange(term: string) {
+    setSearchTerm(term)
+    setCurrentPage(1)
+  }
+  function handleSubjectChange(subject: string) {
+    setSelectedSubject(subject)
+    setCurrentPage(1)
+  }
+  const testsPerPage = 12
 
   // Data
   const aiGeneratedTests = LearningDataService.getAIGeneratedTests()
   const achievements = LearningDataService.getAchievements()
   const subjects = LearningDataService.getSubjects()
   const filteredTests = LearningUtils.filterTests(aiGeneratedTests, searchTerm, selectedSubject)
+  const totalPages = Math.ceil(filteredTests.length / testsPerPage)
+  const paginatedTests = filteredTests.slice((currentPage - 1) * testsPerPage, currentPage * testsPerPage)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50">
@@ -39,19 +53,52 @@ export default function LearningDashboard() {
           </TabsList>
           {/* ai study */}
           <TabsContent value="tests" className="space-y-6 mt-6">
-            <SearchFilters
-              searchTerm={searchTerm}
-              selectedSubject={selectedSubject}
-              subjects={subjects}
-              onSearchChange={setSearchTerm}
-              onSubjectChange={setSelectedSubject}
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTests.map((test) => (
-                <TestCard key={test.id} test={test} />
-              ))}
+            {/* Search box only, no filters dropdown or more filters button */}
+            <div className="mb-6">
+              <input
+                type="text"
+                placeholder="Search tests..."
+                value={searchTerm}
+                onChange={e => handleSearchChange(e.target.value)}
+                className="border rounded px-3 py-2 w-full"
+              />
             </div>
-            {/* achivement */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedTests.length > 0 ? (
+                paginatedTests.map((test) => (
+                  <TestCard key={test.id} test={test} />
+                ))
+              ) : (
+                <div className="col-span-full text-center text-gray-500 py-8">No tests found.</div>
+              )}
+            </div>
+            {/* Pagination Controls */}
+            <div className="flex justify-center items-center gap-2 mt-6">
+              <button
+                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1 || filteredTests.length === 0}
+              >
+                Previous
+              </button>
+              {[...Array(totalPages > 0 ? totalPages : 1)].map((_, idx) => (
+                <button
+                  key={idx}
+                  className={`px-3 py-1 rounded ${currentPage === idx + 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  onClick={() => setCurrentPage(idx + 1)}
+                  disabled={filteredTests.length === 0}
+                >
+                  {idx + 1}
+                </button>
+              ))}
+              <button
+                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages > 0 ? totalPages : 1))}
+                disabled={currentPage === (totalPages > 0 ? totalPages : 1) || filteredTests.length === 0}
+              >
+                Next
+              </button>
+            </div>
           </TabsContent>
           <TabsContent value="achievements" className="space-y-6 mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

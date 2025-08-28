@@ -8,13 +8,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Camera, Save, User, Settings, Trophy, BookOpen, Users } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 
 export default function ProfilePage() {
+  const stats = [
+    { label: "Posts Created", value: "24" },
+    { label: "Teams Joined", value: "3" },
+    { label: "Materials Shared", value: "12" },
+    { label: "Reputation Points", value: "1,247" },
+  ];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [profilePicUrl, setProfilePicUrl] = useState("/placeholder.svg?height=96&width=96");
+  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showSkillInput, setShowSkillInput] = useState(false);
   const [newSkill, setNewSkill] = useState("");
@@ -23,27 +30,26 @@ export default function ProfilePage() {
   const [profileData, setProfileData] = useState({
     firstName: "",
     lastName: "",
+    studentEmail: "",
+    username: "",
     email: "",
     university: "",
     major: "",
-    year: "",
-    bio: "",
     location: "",
+    bio: "",
     website: "",
     github: "",
     linkedin: "",
-    phoneNumber: "",
     dateOfBirth: "",
-    username: "",
     profilePictureUrl: "",
     profilePicturePublicId: "",
-    interests: [],
-    skills: [],
+    interests: [] as string[],
+    skills: [] as string[],
     createdAt: "",
     role: "",
     isVerified: false,
     studentAccountVerified: false,
-    studentEmail: "",
+    phoneNumber: "",
   });
 
   // Fetch profile data from backend and auto-fill all fields
@@ -56,25 +62,32 @@ export default function ProfilePage() {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        query: `query GetCurrentUser  { getCurrentUser  { id email firstName lastName username phoneNumber profilePictureUrl profilePicturePublicId dateOfBirth bio location role isVerified studentAccountVerified university major website linkedin github interests skills createdAt } }`
+        query: `query GetCurrentUser { getCurrentUser { id email firstName lastName username phoneNumber profilePictureUrl profilePicturePublicId dateOfBirth bio location role isVerified studentAccountVerified studentEmail university major website linkedin github interests skills createdAt } }`,
       }),
     })
       .then(res => res.json())
       .then(data => {
+        console.log("Profile fetch response:", data);
         if (data.data && data.data.getCurrentUser) {
+          const user = data.data.getCurrentUser;
           setProfileData(prev => ({
             ...prev,
-            ...data.data.getCurrentUser,
-            interests: Array.isArray(data.data.getCurrentUser.interests) ? data.data.getCurrentUser.interests : [],
-            skills: Array.isArray(data.data.getCurrentUser.skills) ? data.data.getCurrentUser.skills : [],
+            ...user,
+            username: user.username || "",
+            interests: Array.isArray(user.interests) ? user.interests : [],
+            skills: Array.isArray(user.skills) ? user.skills : [],
+            phoneNumber: user.phoneNumber || "",
           }));
-          if (data.data.getCurrentUser.profilePictureUrl) {
-            setProfilePicUrl(data.data.getCurrentUser.profilePictureUrl);
+          if (user.profilePictureUrl) {
+            setProfilePicUrl(user.profilePictureUrl);
           }
+        } else if (data.errors) {
+          alert(data.errors[0]?.message || "Failed to fetch profile.");
         }
       })
-      .catch(() => {
-        // Optionally handle error
+      .catch((err) => {
+        console.error("Profile fetch error:", err);
+        alert("Error fetching profile. Please try again.");
       });
   }, []);
 
@@ -82,12 +95,12 @@ export default function ProfilePage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("profileData", JSON.stringify(profileData));
-      // Also update profilePicUrl for Navbar
       if (profileData.profilePictureUrl) {
         localStorage.setItem("profilePicUrl", profileData.profilePictureUrl);
       }
     }
   }, [profileData]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("profilePicUrl", profilePicUrl);
@@ -104,25 +117,24 @@ export default function ProfilePage() {
   }, [profileData.skills, profileData.interests]);
 
   const handleInputChange = (field: string, value: string) => {
-    setProfileData((prev) => ({ ...prev, [field]: value }))
-  }
+    setProfileData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleSave = async () => {
-    // Prepare input for mutation
+    setSaving(true);
     const input = {
       firstName: profileData.firstName,
       lastName: profileData.lastName,
-      phoneNumber: profileData.phoneNumber,
-      bio: profileData.bio,
-      dateOfBirth: profileData.dateOfBirth,
       university: profileData.university,
       major: profileData.major,
-      website: profileData.website,
-      linkedin: profileData.linkedin,
-      github: profileData.github,
       location: profileData.location,
-      interests: Array.isArray(profileData.interests) ? profileData.interests : [],
-      skills: Array.isArray(profileData.skills) ? profileData.skills : [],
+      bio: profileData.bio,
+      website: profileData.website,
+      github: profileData.github,
+      linkedin: profileData.linkedin,
+      // // dateOfBirth: profileData.dateOfBirth,
+      // interests: Array.isArray(profileData.interests) ? profileData.interests : [],
+      // skills: Array.isArray(profileData.skills) ? profileData.skills : [],
     };
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
     try {
@@ -138,17 +150,42 @@ export default function ProfilePage() {
         }),
       });
       const data = await res.json();
+      console.log("Mutation response:", data); // Debug log full response
       if (data.data && data.data.updateUserProfile) {
         setProfileData(prev => ({ ...prev, ...data.data.updateUserProfile }));
         alert("Profile updated successfully!");
       } else {
+        console.error(data.errors); // Debug log errors
         alert(data.errors?.[0]?.message || "Failed to update profile.");
       }
-    } catch (err) {
+    } catch (error) {
       alert("Failed to update profile. Please try again.");
-      console.log(err);
+      console.error(error);
+    } finally {
+      setSaving(false);
     }
-  }
+  };
+
+  // Sync skills and interests to profileData
+  const handleAddSkill = () => {
+    if (newSkill.trim()) {
+      const updatedSkills = [...skills, newSkill.trim()];
+      setSkills(updatedSkills);
+      setProfileData(prev => ({ ...prev, skills: updatedSkills }));
+      setNewSkill("");
+      setShowSkillInput(false);
+    }
+  };
+
+  const handleAddInterest = () => {
+    if (newInterest.trim()) {
+      const updatedInterests = [...interests, newInterest.trim()];
+      setInterests(updatedInterests);
+      setProfileData(prev => ({ ...prev, interests: updatedInterests }));
+      setNewInterest("");
+      setShowInterestInput(false);
+    }
+  };
 
   const achievements = [
     {
@@ -169,28 +206,12 @@ export default function ProfilePage() {
       date: "Oct 2024",
       icon: Users,
     },
-  ]
-
-  const stats = [
-    { label: "Posts Created", value: "24" },
-    { label: "Teams Joined", value: "3" },
-    { label: "Materials Shared", value: "12" },
-    { label: "Reputation Points", value: "1,247" },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50">
       <Navbar />
-
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">
-            Profile Settings
-          </h1>
-          <p className="text-slate-600 mt-2">Manage your account information and preferences</p>
-        </div>
-
         <Tabs defaultValue="profile" className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-white shadow-sm">
             <TabsTrigger value="profile" className="flex items-center gap-2">
@@ -245,13 +266,14 @@ export default function ProfilePage() {
                         const res = await fetch("http://localhost:9000/student/profile-picture", {
                           method: "POST",
                           headers: {
-                            Authorization: `Bearer ${token}`
+                            Authorization: `Bearer ${token}`,
                           },
-                          body: formData
+                          body: formData,
                         });
                         const data = await res.json();
                         if (data.success && data.user && data.user.profilePictureUrl) {
                           setProfilePicUrl(data.user.profilePictureUrl);
+                          setProfileData(prev => ({ ...prev, profilePictureUrl: data.user.profilePictureUrl }));
                         } else {
                           alert(data.message || "Failed to upload profile picture");
                         }
@@ -294,46 +316,48 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="userName">User Name</Label>
+                  <Label htmlFor="universityEmail">University Email</Label>
+                  <div className="flex items-center gap-2">
                     <Input
-                      id="userName"
-                      value={profileData.firstName + ' ' + profileData.lastName}
+                      id="universityEmail"
+                      type="email"
+                      value={profileData.studentEmail || ""}
                       readOnly
-                      className="bg-gray-100 cursor-not-allowed"
+                      className="bg-gray-100 cursor-not-allowed flex-1"
                     />
+                    {profileData.studentAccountVerified ? (
+                      <>
+                        <Badge className="bg-green-500 text-white">Verified</Badge>
+                        <Button size="icon" disabled className="bg-green-500 hover:bg-green-600 text-white rounded-full">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Badge className="bg-yellow-400 text-white">Not Verified</Badge>
+                        <Button size="icon" disabled className="bg-yellow-400 hover:bg-yellow-500 text-white rounded-full">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 17a5 5 0 100-10 5 5 0 000 10z" />
+                          </svg>
+                        </Button>
+                      </>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="universityEmail">University Email</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="universityEmail"
-                        type="email"
-                        value={profileData.studentEmail || profileData.email}
-                        readOnly
-                        className="bg-gray-100 cursor-not-allowed flex-1"
-                      />
-                      {profileData.studentAccountVerified ? (
-                        <>
-                          <Badge className="bg-green-500 text-white">Verified</Badge>
-                          <Button size="icon" disabled className="bg-green-500 hover:bg-green-600 text-white rounded-full">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                            </svg>
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Badge className="bg-yellow-400 text-white">Not Verified</Badge>
-                          <Button size="icon" disabled className="bg-yellow-400 hover:bg-yellow-500 text-white rounded-full">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 17a5 5 0 100-10 5 5 0 000 10z" />
-                            </svg>
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    value={profileData.username || ""}
+                    readOnly
+                    className="bg-gray-100 cursor-not-allowed"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -413,7 +437,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="github">GitHub URL</Label>
+                    <Label htmlFor="github">GitHub Username</Label>
                     <Input
                       id="github"
                       placeholder="username"
@@ -451,8 +475,8 @@ export default function ProfilePage() {
                     ))}
                   </div>
                   <button
-                    type="button"
                     className="mt-3 ml-1 inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white hover:bg-blue-600 focus:outline-none"
+                    disabled={saving}
                     onClick={() => setShowSkillInput((v) => !v)}
                     title="Add Skill"
                   >
@@ -469,22 +493,11 @@ export default function ProfilePage() {
                         onChange={e => setNewSkill(e.target.value)}
                         onKeyDown={e => {
                           if (e.key === 'Enter' && newSkill.trim()) {
-                            setSkills(prev => [...prev, newSkill.trim()]);
-                            setNewSkill("");
-                            setShowSkillInput(false);
+                            handleAddSkill();
                           }
                         }}
                       />
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          if (newSkill.trim()) {
-                            setSkills(prev => [...prev, newSkill.trim()]);
-                            setNewSkill("");
-                            setShowSkillInput(false);
-                          }
-                        }}
-                      >Add</Button>
+                      <Button size="sm" onClick={handleAddSkill}>Add</Button>
                     </div>
                   )}
                 </div>
@@ -517,22 +530,11 @@ export default function ProfilePage() {
                         onChange={e => setNewInterest(e.target.value)}
                         onKeyDown={e => {
                           if (e.key === 'Enter' && newInterest.trim()) {
-                            setInterests(prev => [...prev, newInterest.trim()]);
-                            setNewInterest("");
-                            setShowInterestInput(false);
+                            handleAddInterest();
                           }
                         }}
                       />
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          if (newInterest.trim()) {
-                            setInterests(prev => [...prev, newInterest.trim()]);
-                            setNewInterest("");
-                            setShowInterestInput(false);
-                          }
-                        }}
-                      >Add</Button>
+                      <Button size="sm" onClick={handleAddInterest}>Add</Button>
                     </div>
                   )}
                 </div>
@@ -543,10 +545,20 @@ export default function ProfilePage() {
             <div className="flex justify-end">
               <Button
                 onClick={handleSave}
-                className="bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
+                className="bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 flex items-center"
+                disabled={saving}
               >
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                {saving ? (
+                  <span className="mr-2 animate-spin inline-block">
+                    <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  </span>
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                {saving ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </TabsContent>
@@ -588,56 +600,56 @@ export default function ProfilePage() {
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6 mt-6">
-          {/* Student Email Verification Box */}
-          <Card className="border-0 shadow-lg mb-6">
-            <CardHeader>
-              <CardTitle>Verify Student Email</CardTitle>
-              <CardDescription>Enter your university email to verify your student status.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4 items-center">
-                <Input
-                  type="email"
-                  placeholder="Enter your .edu email"
-                  value={profileData.studentEmail || ""}
-                  onChange={e => setProfileData(prev => ({ ...prev, studentEmail: e.target.value }))}
-                  className="flex-1"
-                  disabled={profileData.studentAccountVerified}
-                  readOnly={profileData.studentAccountVerified}
-                />
-                {profileData.studentAccountVerified ? (
-                  <Button disabled className="bg-green-500 text-white">Verified</Button>
-                ) : (
-                  <Button
-                    className="bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
-                    onClick={async () => {
-                      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
-                      try {
-                        const formData = new URLSearchParams();
-                        formData.append("studentEmail", profileData.studentEmail || "");
-                        const res = await fetch("http://localhost:9000/student/verify-student-email", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            Authorization: `Bearer ${token}`,
-                          },
-                          body: formData.toString(),
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          alert("Student verification email sent. Please check your student email inbox.");
-                        } else {
-                          alert(data.message || "Verification failed.");
+            {/* Student Email Verification Box */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardHeader>
+                <CardTitle>Verify Student Email</CardTitle>
+                <CardDescription>Enter your university email to verify your student status.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col md:flex-row gap-4 items-center">
+                  <Input
+                    type="email"
+                    placeholder="Enter your .edu email"
+                    value={profileData.studentEmail || ""}
+                    onChange={e => setProfileData(prev => ({ ...prev, studentEmail: e.target.value }))}
+                    className="flex-1"
+                    disabled={profileData.studentAccountVerified}
+                    readOnly={profileData.studentAccountVerified}
+                  />
+                  {profileData.studentAccountVerified ? (
+                    <Button disabled className="bg-green-500 text-white">Verified</Button>
+                  ) : (
+                    <Button
+                      className="bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600"
+                      onClick={async () => {
+                        const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+                        try {
+                          const formData = new URLSearchParams();
+                          formData.append("studentEmail", profileData.studentEmail || "");
+                          const res = await fetch("http://localhost:9000/student/verify-student-email", {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/x-www-form-urlencoded",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: formData.toString(),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            alert("Student verification email sent. Please check your student email inbox.");
+                          } else {
+                            alert(data.message || "Verification failed.");
+                          }
+                        } catch {
+                          alert("Verification failed. Please try again.");
                         }
-                      } catch {
-                        alert("Verification failed. Please try again.");
-                      }
-                    }}
-                  >Verify</Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                      }}
+                    >Verify</Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle>Account Settings</CardTitle>
@@ -655,5 +667,5 @@ export default function ProfilePage() {
         </Tabs>
       </main>
     </div>
-  )
+  );
 }
